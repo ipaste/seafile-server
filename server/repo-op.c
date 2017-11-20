@@ -5019,7 +5019,7 @@ collect_file_revisions (SeafCommit *commit, void *vdata, gboolean *stop)
         return TRUE;
     }
 
-    if (data->max_revision > 0 && data->n_commits > data->max_revision) {
+    if (data->max_revision > 0 && data->n_commits >= data->max_revision) {
         *stop = TRUE;
         return TRUE;
     }
@@ -5369,19 +5369,41 @@ seaf_repo_manager_list_file_revisions (SeafRepoManager *mgr,
     ret = convert_rpc_commit_list (commit_list, file_id_list, file_size_list,
                                    is_renamed, old_path);
 
+    int remaining_max = -1, remaining_limit = -1;
+    if (max_revision > 0) {
+        remaining_max = max_revision - g_list_length(commit_list);
+        if (remaining_max <= 0) {
+            g_free (parent_id);
+            g_free (old_path);
+            goto out;
+        }
+    }
+    /* Make sure the number of returned commits is less than limit */
+    /* but the commits we traversed may more than limit when handling renamed file */
+    if (limit > 0) {
+        remaining_limit = limit - g_list_length(commit_list);
+        if (remaining_limit <= 0) {
+            g_free (parent_id);
+            g_free (old_path);
+            goto out;
+        }
+    }
+
     if (is_renamed) {
         if (ret) {
             // if previous scan got revision then set got_latest True for renamend scan
             /* Get the revisions of the old path, starting from parent commit. */
             old_revisions = seaf_repo_manager_list_file_revisions (mgr, repo_id,
                                                                    parent_id, old_path,
-                                                                   -1, -1, show_days,
+                                                                   remaining_max,
+                                                                   remaining_limit, show_days,
                                                                    TRUE, data.got_second, error);
         } else {
             /* Get the revisions of the old path, starting from parent commit. */
             old_revisions = seaf_repo_manager_list_file_revisions (mgr, repo_id,
                                                                    parent_id, old_path,
-                                                                   -1, -1, show_days,
+                                                                   remaining_max,
+                                                                   remaining_limit, show_days,
                                                                    FALSE, data.got_second, error);
         }
         ret = g_list_concat (ret, old_revisions);

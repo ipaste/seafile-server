@@ -389,6 +389,7 @@ seaf_commit_manager_traverse_commit_tree_with_limit (SeafCommitManager *mgr,
     commit = seaf_commit_manager_get_commit (mgr, repo_id, version, head);
     if (!commit) {
         seaf_warning ("Failed to find commit %s.\n", head);
+        g_hash_table_destroy (commit_hash);
         return FALSE;
     }
 
