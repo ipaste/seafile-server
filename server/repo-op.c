@@ -4754,6 +4754,7 @@ struct CollectRevisionParam {
      */
     gint64 truncate_time;
     gboolean got_latest;
+    gboolean got_second;
 
     GError **error;
 };
@@ -5011,7 +5012,8 @@ collect_file_revisions (SeafCommit *commit, void *vdata, gboolean *stop)
 
     if (data->got_latest &&
         data->truncate_time > 0 &&
-        (gint64)(commit->ctime) < data->truncate_time)
+        (gint64)(commit->ctime) < data->truncate_time &&
+        data->got_second)
     {
         *stop = TRUE;
         return TRUE;
@@ -5100,9 +5102,12 @@ collect_file_revisions (SeafCommit *commit, void *vdata, gboolean *stop)
         }
     }
 
-    if (!data->got_latest)
+    if (!data->got_latest) {
         data->got_latest = TRUE;
-
+    } else {
+        if (!data->got_second)
+            data->got_second = TRUE;
+    }
     add_revision_info (data, commit, file_info->file_id, file_info->file_size);
 
 out:
@@ -5282,6 +5287,7 @@ seaf_repo_manager_list_file_revisions (SeafRepoManager *mgr,
                                        int limit,
                                        int show_days,
                                        gboolean got_latest,
+                                       gboolean got_second,
                                        GError **error)
 {
     SeafRepo *repo = NULL;
@@ -5327,6 +5333,7 @@ seaf_repo_manager_list_file_revisions (SeafRepoManager *mgr,
     data.file_id_list = NULL;
     data.file_size_list = NULL;
     data.got_latest = got_latest;
+    data.got_second = got_second;
 
     /* A hash table to cache caculated file info of <path> in <commit> */
     data.file_info_cache = g_hash_table_new_full (g_str_hash, g_str_equal,
@@ -5369,13 +5376,13 @@ seaf_repo_manager_list_file_revisions (SeafRepoManager *mgr,
             old_revisions = seaf_repo_manager_list_file_revisions (mgr, repo_id,
                                                                    parent_id, old_path,
                                                                    -1, -1, show_days,
-                                                                   TRUE, error);
+                                                                   TRUE, data.got_second, error);
         } else {
             /* Get the revisions of the old path, starting from parent commit. */
             old_revisions = seaf_repo_manager_list_file_revisions (mgr, repo_id,
                                                                    parent_id, old_path,
                                                                    -1, -1, show_days,
-                                                                   FALSE, error);
+                                                                   FALSE, data.got_second, error);
         }
         ret = g_list_concat (ret, old_revisions);
         g_free (parent_id);
